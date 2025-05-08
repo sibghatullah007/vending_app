@@ -1,5 +1,6 @@
 // pages/index.js
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function Home() {
   return (
@@ -45,18 +46,20 @@ export default function Home() {
         </div>
 
         {/* Select Snack with AI */}
-        <div className="flex flex-col items-center">
-          <Image
-            src="/images/circle_machine.png"
-            alt="Select Snack with AI"
-            width={400}
-            height={400}
-            className="mb-6"
-          />
-          <button className="px-8 py-4 text-4xl font-bold bg-gradient-to-b from-sky-500 to-cyan-950 bg-clip-text text-transparent">
-            Select Snack with AI
-          </button>
-        </div>
+        {/* <div className="flex flex-col items-center"> */}
+        <Link href="/ai-selector" className="flex flex-col items-center">
+        <Image
+          src="/images/circle_machine.png"
+          alt="Select Snack with AI"
+          width={400}
+          height={400}
+          className="mb-6 cursor-pointer"
+        />
+        <span className="px-8 py-4 text-4xl font-bold bg-gradient-to-b from-sky-500 to-cyan-950 bg-clip-text text-transparent">
+          Select Snack with AI
+        </span>
+      </Link>
+        {/* </div> */}
       </div>
     </div>
   )
