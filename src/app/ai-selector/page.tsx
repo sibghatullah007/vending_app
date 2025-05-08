@@ -24,7 +24,6 @@ export default function Home() {
     ];
 
     const [activeIndex, setActiveIndex] = useState(3); // Start with Muscle Pick
-    const radius = 200;
 
     const rotateCircle = (index: number) => {
         setActiveIndex(index);
@@ -74,9 +73,11 @@ export default function Home() {
                                         zIndex: isActive ? 20 : 10,
                                     }}
                                 >
-                                    <img
+                                    <Image
                                         src={item.image}
                                         alt={item.title}
+                                        width={isActive ? 160 : 80}
+                                        height={isActive ? 160 : 80}
                                         className={`mx-auto transition-all duration-500 ${isActive ? 'w-40 h-40 bg-blue-200 rounded-full' : 'w-20 h-20'}`}
                                     />
                                     <p className="font-bold text-black text-xl mt-2">{item.title}</p>
