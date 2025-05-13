@@ -24,3 +24,24 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+@keyframes moveAndRotate {
+  0% {
+    transform: translateX(0) translateY(0) rotate(0deg); /* Start at left-[110px] */
+  }
+  25% {
+    transform: translateX(10px) translateY(0) rotate(90deg); /* Move right and rotate 90 degrees */
+  }
+  50% {
+    transform: translateX(10px) translateY(-50px) rotate(180deg); /* Jump up and rotate 180 degrees */
+  }
+  75% {
+    transform: translateX(10px) translateY(0) rotate(270deg); /* Move back to bottom and rotate 270 degrees */
+  }
+  100% {
+    transform: translateX(0) translateY(0) rotate(360deg); /* Reset to original position with full rotation */
+  }
+}
+
+.animation-move-rotate {
+  animation: moveAndRotate 1.5s ease-in-out forwards;
+}
