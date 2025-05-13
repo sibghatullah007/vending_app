@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// Import the custom fonts from Google Fonts
+const protestRiot = "https://fonts.googleapis.com/css2?family=Protest+Riot&display=swap";
+const poppins = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap";
+const abyssinicaSIL = "https://fonts.googleapis.com/css2?family=Abyssinica+SIL&display=swap";
+
+// Include the Geist and Geist_Mono fonts
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -24,8 +30,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Link the custom fonts */}
+        <link href={protestRiot} rel="stylesheet" />
+        <link href={poppins} rel="stylesheet" />
+        <link href={abyssinicaSIL} rel="stylesheet" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{
+          fontFamily: 'Poppins, sans-serif', // Default for body text
+        }}
       >
         {children}
       </body>
