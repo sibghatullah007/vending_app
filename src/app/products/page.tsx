@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { FaArrowAltCircleRight } from 'react-icons/fa';
 import { FaCartPlus } from 'react-icons/fa';
@@ -27,6 +28,7 @@ const products: Product[] = [
 ];
 
 export default function Page() {
+  const router = useRouter();
   const [cart, setCart] = useState<Product[]>([]);
   const [movedButtons, setMovedButtons] = useState<{ [key: number]: boolean }>({});
   const [isButtonDisabled, setIsButtonDisabled] = useState(false); // Track if buttons are disabled
@@ -65,6 +67,7 @@ export default function Page() {
     if (selectedProduct) {
       setCart([...cart, selectedProduct]); // Add selected product to the cart
       setIsPopupVisible(false); // Close the pop-up
+      router.push('/product-details');
     }
   };
 
