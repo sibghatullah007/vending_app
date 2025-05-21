@@ -12,7 +12,7 @@ import { useCart } from '@/context/CartContext';
 
 export default function Page() {
   const router = useRouter();
-  const { cart, addToCart, updateQuantity, totalItems, totalPrice } = useCart();
+  const { cart, addToCart, updateQuantity, totalItems } = useCart();
   const [movedButtons, setMovedButtons] = useState<{ [key: number]: boolean }>({});
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
