@@ -6,6 +6,22 @@ import { useRouter } from 'next/navigation';
 import { FaMicrophoneAlt, FaCamera } from 'react-icons/fa';
 import { ImCross } from "react-icons/im";
 
+interface ApiResponse {
+  success: boolean;
+  filename: string;
+  file_size_bytes: number;
+  analysis: {
+    description: string;
+    recommended_category: string;
+    products: Array<{
+      name: string;
+      price: number;
+    }>;
+    total_products: number;
+  };
+  message: string;
+}
+
 export default function Page() {
   const router = useRouter();
   const items = [
@@ -31,7 +47,7 @@ export default function Page() {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isMicrophoneModalOpen, setIsMicrophoneModalOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -266,10 +282,13 @@ export default function Page() {
               <ImCross />
             </button>
             {capturedImage ? (
-              <img
+              <Image
                 src={capturedImage}
                 alt="Captured"
+                width={1920}
+                height={1080}
                 className="w-full h-auto rounded-lg"
+                unoptimized
               />
             ) : (
               <video
