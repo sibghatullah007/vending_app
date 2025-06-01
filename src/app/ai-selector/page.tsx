@@ -28,21 +28,30 @@ export default function Page() {
   ];
 
   const [activeIndex, setActiveIndex] = useState(3); // Start with Muscle Pick
-  const [isCameraOpen, setIsCameraOpen] = useState(false); // Camera modal state
-  const [isMicrophoneModalOpen, setIsMicrophoneModalOpen] = useState(false); // Microphone modal state
-  const videoRef = useRef<HTMLVideoElement>(null); // Reference to the video element
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isMicrophoneModalOpen, setIsMicrophoneModalOpen] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const openCamera = () => {
     setIsCameraOpen(true);
+    setCapturedImage(null);
+    setApiResponse(null);
+    setIsLoading(false);
   };
 
   const closeCamera = () => {
     setIsCameraOpen(false);
+    setCapturedImage(null);
+    setApiResponse(null);
+    setIsLoading(false);
     if (videoRef.current) {
       const stream = videoRef.current.srcObject as MediaStream;
       if (stream) {
         const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop()); // Stop camera
+        tracks.forEach(track => track.stop());
       }
     }
   };
@@ -79,6 +88,32 @@ export default function Page() {
       if ((index - activeIndex + items.length) % items.length === 0) {
       }
     }, 300);
+  };
+
+  const handleTryAgain = async () => {
+    setCapturedImage(null);
+    setApiResponse(null);
+    
+    // Stop existing stream
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+
+    // Start new stream
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error("Error accessing the camera: ", error);
+    }
+  };
+
+  const handleViewProducts = () => {
+    router.push('/products');
   };
 
   return (
@@ -230,12 +265,112 @@ export default function Page() {
             >
               <ImCross />
             </button>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full h-auto rounded-lg"
-            />
+            {capturedImage ? (
+              <img
+                src={capturedImage}
+                alt="Captured"
+                className="w-full h-auto rounded-lg"
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-auto rounded-lg"
+              />
+            )}
+            {!capturedImage && (
+              <button
+                onClick={async () => {
+                  if (videoRef.current) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoRef.current.videoWidth;
+                    canvas.height = videoRef.current.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.drawImage(videoRef.current, 0, 0);
+                      const imageUrl = canvas.toDataURL('image/jpeg');
+                      setCapturedImage(imageUrl);
+                      setIsLoading(true);
+                      
+                      canvas.toBlob(async (blob) => {
+                        if (blob) {
+                          const formData = new FormData();
+                          formData.append('file', blob, 'capture.jpg');
+                          
+                          try {
+                            const response = await fetch('https://shark-supreme-readily.ngrok-free.app/analyze-image', {
+                              method: 'POST',
+                              headers: {
+                                'Accept': 'application/json',
+                              },
+                              body: formData,
+                            });
+                            if (!response.ok) {
+                              throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            const data = await response.json();
+                            console.log('API Response:', data);
+                            setApiResponse(data);
+                          } catch (error) {
+                            console.error('Error uploading image:', error);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }
+                      }, 'image/jpeg', 0.8);
+                    }
+                  }
+                }}
+                className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-4 shadow-lg hover:bg-gray-100"
+              >
+                <div className="w-16 h-16 border-4 border-gray-800 rounded-full"></div>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Loading Modal */}
+      {isLoading && (
+        <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-sky-500 border-t-transparent mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Analyzing Image</h2>
+            <p className="text-gray-600">Please wait while we process your image...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Response Modal */}
+      {apiResponse && !isLoading && (
+        <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
+            <h2 className="text-3xl font-bold text-center mb-6 bg-gradient-to-b from-sky-500 to-cyan-950 bg-clip-text text-transparent">
+              Analysis Complete!
+            </h2>
+            <div className="space-y-4 mb-8">
+              <p className="text-xl text-gray-700">{apiResponse.analysis.description}</p>
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <p className="text-2xl font-semibold text-sky-800">
+                  Recommended Category: {apiResponse.analysis.recommended_category}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={handleViewProducts}
+                className="px-6 py-3 bg-gradient-to-b from-sky-500 to-cyan-950 text-white font-bold rounded-lg shadow-lg hover:from-sky-600 hover:to-cyan-800 transition duration-300"
+              >
+                View Products
+              </button>
+              <button
+                onClick={handleTryAgain}
+                className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg shadow-lg hover:bg-gray-300 transition duration-300"
+              >
+                Try Again
+              </button>
+            </div>
           </div>
         </div>
       )}

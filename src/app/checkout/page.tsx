@@ -3,9 +3,11 @@
 import Image from "next/image";
 import { FaTrashAlt } from "react-icons/fa";
 import { useCart } from "@/context/CartContext";
+import { useRouter } from "next/navigation";
 
 export default function CheckoutPage() {
     const { cart, removeFromCart, totalPrice } = useCart();
+    const router = useRouter();
     const discount = 0;
     const coupons = 0;
 
@@ -45,7 +47,12 @@ export default function CheckoutPage() {
                                 <div className="font-bold mt-1 text-xl">Quantity: {product.quantity.toString().padStart(2, '0')}</div>
                             </div>
                             <button
-                                onClick={() => removeFromCart(product.id)}
+                                onClick={() => {removeFromCart(product.id) 
+                                    console.log(cart.length)
+                                    if(cart.length <= 1) {
+                                        router.push('/ai-selector');
+                                    }
+                                }}
                                 className="text-white hover:text-red-300 text-xl p-2"
                                 aria-label={`Delete ${product.name}`}
                             >
