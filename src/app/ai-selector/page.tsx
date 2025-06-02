@@ -10,6 +10,7 @@ interface ApiResponse {
   success: boolean;
   filename: string;
   file_size_bytes: number;
+  transcription?: string;
   analysis: {
     description: string;
     recommended_category: string;
@@ -21,6 +22,17 @@ interface ApiResponse {
   };
   message: string;
 }
+
+const styles = `
+  @keyframes wave {
+    0%, 100% {
+      transform: scaleY(1);
+    }
+    50% {
+      transform: scaleY(1.5);
+    }
+  }
+`;
 
 export default function Page() {
   const router = useRouter();
@@ -49,7 +61,23 @@ export default function Page() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+    return () => {
+      document.head.removeChild(styleSheet);
+    };
+  }, []);
 
   const openCamera = () => {
     setIsCameraOpen(true);
@@ -106,9 +134,96 @@ export default function Page() {
     }, 300);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      // Set up audio analysis
+      audioContextRef.current = new AudioContext();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      source.connect(analyserRef.current);
+
+      // Start analyzing audio levels
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      const updateAudioLevel = () => {
+        if (analyserRef.current && isRecording) {
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+          setAudioLevel(average);
+          requestAnimationFrame(updateAudioLevel);
+        }
+      };
+      updateAudioLevel();
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+        }
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/m4a' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setAudioUrl(audioUrl);
+        setIsLoading(true);
+        setAudioLevel(0);
+
+        // Send to API
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.m4a');
+
+        try {
+          const response = await fetch('https://shark-supreme-readily.ngrok-free.app/analyze-audio', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+            },
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          console.log('API Response:', data);
+          setApiResponse(data);
+        } catch (error) {
+          console.error('Error uploading audio:', error);
+        } finally {
+          setIsLoading(false);
+        }
+
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   const handleTryAgain = async () => {
     setCapturedImage(null);
     setApiResponse(null);
+    setAudioUrl(null);
     
     // Stop existing stream
     if (videoRef.current && videoRef.current.srcObject) {
@@ -261,9 +376,36 @@ export default function Page() {
               <p className="text-2xl text-center mb-8 text-gray-600">Let me help you to Find Your Taste!</p>
               <button
                 className="flex items-center justify-center m-auto bg-gradient-to-b from-sky-500 to-cyan-950 focus:from-sky-950 focus:to-cyan-500 focus:scale-[1.1] text-white rounded-full shadow-lg transition duration-300 h-60 w-60"
+                onClick={isRecording ? stopRecording : startRecording}
               >
-                <FaMicrophoneAlt className='h-20 w-30' />
+                <div className="relative">
+                  <FaMicrophoneAlt className='h-20 w-30' />
+                  {isRecording && (
+                    <div className="absolute -top-4 -right-4 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                  )}
+                </div>
               </button>
+              {isRecording && (
+                <div className="mt-4 text-center">
+                  <div className="flex justify-center gap-1.5 h-48 items-end">
+                    {[...Array(30)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-2 bg-sky-500 rounded-full transition-all duration-75 ease-in-out"
+                        style={{
+                          height: `${Math.max(10, (audioLevel / 255) * 250 * Math.sin((i + 1) / 4))}%`,
+                          backgroundColor: `rgb(14, 165, 233, ${0.3 + (audioLevel / 255) * 0.7})`,
+                          transform: `scaleY(${1 + (audioLevel / 255) * 0.8})`,
+                          boxShadow: `0 0 ${(audioLevel / 255) * 15}px rgba(14, 165, 233, ${0.3 + (audioLevel / 255) * 0.7})`,
+                          animation: `wave ${0.5 + Math.random() * 0.5}s ease-in-out infinite`,
+                          animationDelay: `${i * 0.05}s`
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-6 text-gray-600 font-medium text-lg">Recording...</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -355,8 +497,14 @@ export default function Page() {
         <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-sky-500 border-t-transparent mx-auto mb-4"></div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Analyzing Image</h2>
-            <p className="text-gray-600">Please wait while we process your image...</p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              {capturedImage ? 'Analyzing Image' : 'Analyzing Audio'}
+            </h2>
+            <p className="text-gray-600">
+              {capturedImage 
+                ? 'Please wait while we process your image...'
+                : 'Please wait while we process your audio...'}
+            </p>
           </div>
         </div>
       )}
