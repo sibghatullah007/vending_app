@@ -62,7 +62,6 @@ export default function Page() {
   const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -171,8 +170,6 @@ export default function Page() {
           audioContextRef.current.close();
         }
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/m4a' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setAudioUrl(audioUrl);
         setIsLoading(true);
         setAudioLevel(0);
 
@@ -223,7 +220,6 @@ export default function Page() {
   const handleTryAgain = async () => {
     setCapturedImage(null);
     setApiResponse(null);
-    setAudioUrl(null);
     
     // Stop existing stream
     if (videoRef.current && videoRef.current.srcObject) {
