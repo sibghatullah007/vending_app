@@ -31,7 +31,8 @@ export default function Home() {
 
       {/* Product Selection Section */}
       <div className="flex justify-center items-center gap-32 mt-20">
-        {/* Select a Product */}
+        {/* Select a Product */}        
+        <Link href="/products" className="flex flex-col items-center">
         <div className="flex flex-col items-center">
           <Image
             src="/images/circle_product.png"
@@ -44,6 +45,7 @@ export default function Home() {
             Select a Product
           </button>
         </div>
+      </Link>
 
         {/* Select Snack with AI */}
         {/* <div className="flex flex-col items-center"> */}

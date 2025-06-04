@@ -2,23 +2,59 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { FaArrowAltCircleRight, FaPlus, FaMinus } from 'react-icons/fa';
 import { FaCartPlus } from 'react-icons/fa';
 import { RxOpenInNewWindow } from "react-icons/rx";
-import { products } from '@/data/products';
+import { Product, fetchProducts } from '@/data/products';
 import { useCart } from '@/context/CartContext';
 
-export default function Page() {
+export default function ProductsPage() {
   const router = useRouter();
   const { cart, addToCart, updateQuantity, totalItems } = useCart();
   const [movedButtons, setMovedButtons] = useState<{ [key: number]: boolean }>({});
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showNoProductsModal, setShowNoProductsModal] = useState(false);
+  const searchParams = useSearchParams();
+  const category = searchParams.get('category');
 
-  const handleAddToCart = (product: typeof products[0]) => {
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setError(null);
+        const allProducts = await fetchProducts();
+        // Filter products by category if category is provided
+        const filteredProducts = category 
+          ? allProducts.filter(product => product.category === category)
+          : allProducts;
+        setProducts(filteredProducts);
+        
+        // Show no products modal if no products found
+        if (filteredProducts.length === 0) {
+          setShowNoProductsModal(true);
+          // Redirect after 3 seconds
+          setTimeout(() => {
+            router.push('/ai-selector');
+          }, 3000);
+        }
+      } catch (err) {
+        console.error('Error loading products:', err);
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, [category, router]);
+
+  const handleAddToCart = (product: Product) => {
     setIsButtonDisabled(true);
     setMovedButtons(prev => ({
       ...prev,
@@ -56,12 +92,43 @@ export default function Page() {
     setIsPopupVisible(false);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="relative w-24 h-24 mx-auto mb-8">
+            {/* Outer ring */}
+            <div className="absolute inset-0 border-4 border-sky-200 rounded-full"></div>
+            {/* Animated ring */}
+            <div className="absolute inset-0 border-4 border-sky-500 rounded-full animate-spin border-t-transparent"></div>
+            {/* Inner circle */}
+            <div className="absolute inset-4 bg-gradient-to-b from-sky-500 to-cyan-950 rounded-full animate-pulse"></div>
+          </div>
+          <div className="text-3xl font-bold bg-gradient-to-r from-sky-500 to-cyan-950 bg-clip-text text-transparent">
+            Loading Products...
+          </div>
+          <div className="mt-4 text-gray-500">
+            Please wait while we fetch your products
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-2xl font-bold text-red-600">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-50" style={{ width: '1905px', minHeight: '100vh' }}>
       <div className="flex items-center justify-between w-full sticky z-100 top-0 px-10 py-8 bg-gray-200">
         <Image
           src="/images/logo.png"
-          alt="Realtime Nutrition Logo"
+          alt="Logo"
           width={450}
           height={140}
         />
@@ -80,6 +147,16 @@ export default function Page() {
           )}
         </button>
       </div>
+
+      {/* Category Title */}
+      {category && (
+        <div className="text-center py-8">
+          <h1 className="text-4xl font-bold text-sky-800">
+            {category} Products
+          </h1>
+        </div>
+      )}
+
       {/* Main Product Grid */}
       <div className='flex pe-10'>
         <div className="flex-grow p-10 grid grid-cols-4 gap-8">
@@ -187,6 +264,30 @@ export default function Page() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Products Found Modal */}
+      {showNoProductsModal && (
+        <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <div className="text-6xl mb-4">🔍</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">No Products Found</h2>
+            <p className="text-gray-600 mb-6">
+              {category 
+                ? `No products available in the "${category}" category.`
+                : 'No products available at the moment.'}
+            </p>
+            <p className="text-sky-600 mb-8">
+              Redirecting to AI Selector in 3 seconds...
+            </p>
+            <button
+              onClick={() => router.push('/ai-selector')}
+              className="px-6 py-3 bg-gradient-to-b from-sky-500 to-cyan-950 text-white font-bold rounded-lg shadow-lg hover:from-sky-600 hover:to-cyan-800 transition duration-300"
+            >
+              Go to AI Selector
+            </button>
           </div>
         </div>
       )}

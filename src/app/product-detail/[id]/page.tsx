@@ -1,21 +1,65 @@
 'use client'
 
-import { useState, use } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { FaStar, FaCheckCircle, FaMinus, FaPlus, FaArrowAltCircleRight } from "react-icons/fa";
-import { products } from "@/data/products";
+import { Product, fetchProducts } from "@/data/products";
 import { useCart } from "@/context/CartContext";
 
-export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+
+export default function ProductDetailPage() {
   const router = useRouter();
+  const { id } = useParams();
   const { addToCart } = useCart();
-  const product = products.find(p => p.id === parseInt(resolvedParams.id));
+  const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"description" | "nutrition">("description");
-  const [mainImage, setMainImage] = useState(product?.images[0] || '');
+  const [mainImage, setMainImage] = useState('');
   const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProduct = async () => {
+      try {
+        const products = await fetchProducts();
+        const foundProduct = products.find(p => p.id === parseInt(id as string));
+        if (foundProduct) {
+          setProduct(foundProduct);
+          setMainImage(foundProduct.images[0]);
+        }
+      } catch (error) {
+        console.error('Error loading product:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) loadProduct();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="relative w-24 h-24 mx-auto mb-8">
+            {/* Outer ring */}
+            <div className="absolute inset-0 border-4 border-sky-200 rounded-full"></div>
+            {/* Animated ring */}
+            <div className="absolute inset-0 border-4 border-sky-500 rounded-full animate-spin border-t-transparent"></div>
+            {/* Inner circle */}
+            <div className="absolute inset-4 bg-gradient-to-b from-sky-500 to-cyan-950 rounded-full animate-pulse"></div>
+          </div>
+          <div className="text-3xl font-bold bg-gradient-to-r from-sky-500 to-cyan-950 bg-clip-text text-transparent">
+            Loading Product...
+          </div>
+          <div className="mt-4 text-gray-500">
+            Please wait while we fetch your product details
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!product) {
     return <div>Product not found</div>;
@@ -47,13 +91,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-center justify-between w-full sticky top-0 px-10 py-8 bg-gray-200">
         <Image
           src="/images/logo.png"
-          alt="Realtime Nutrition Logo"
+          alt="Logo"
           width={410}
           height={110}
         />
       </div>
       <div className="flex justify-center gap-30 w-full">
-        {/* Left Image Gallery */}
         <div className="flex flex-col gap-3">
           <div className="w-[757px] h-[757px] rounded-lg overflow-hidden shadow-lg">
             <Image src={mainImage} alt={product.name} width={757} height={757} className="object-contain" />
@@ -63,8 +106,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div
                 key={idx}
                 onClick={() => setMainImage(img)}
-                className={`w-[140px] h-[140px] rounded-lg shadow-lg cursor-pointer overflow-hidden border-4 ${mainImage === img ? "border-sky-600" : "border-transparent"
-                  }`}
+                className={`w-[140px] h-[140px] rounded-lg shadow-lg cursor-pointer overflow-hidden border-4 ${mainImage === img ? "border-sky-600" : "border-transparent"}`}
               >
                 <Image src={img} alt={`${product.name} thumbnail`} width={200} height={200} className="object-contain" />
               </div>
@@ -85,10 +127,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             ))}
           </div>
 
-          {/* Title */}
-          <h1 className="font-extrabold text-sky-800 text-6xl mb-4">{product.name}</h1>
-
           {/* Description */}
+          <h2 className="text-gray-700 text-6xl font-bold mb-6">{product.name}</h2>
           <p className="text-gray-700 text-2xl mb-6">{product.description}</p>
 
           {/* Flavor */}
@@ -121,7 +161,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             >
               <FaPlus />
             </button>
-            <span className="text-gray-700 font-semibold">{(product.stock)}</span>
+            <span className="text-gray-700 font-semibold">({product.stock})</span>
           </div>
 
           {/* Price & Buy Buttons */}
@@ -139,7 +179,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </button>
           </div>
 
-          {/* Tabs */}
           <div className="mb-4 flex gap-4 border-b border-gray-300">
             <button
               onClick={() => setActiveTab("description")}
@@ -174,7 +213,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             {activeTab === "nutrition" && (
               <ul className="space-y-2 text-gray-700">
                 {product.ingredients.map((ingredient, i) => (
-                  <li key={i} className="flex items-center gap-2 border-b border-gray-300 py-1 text-xl">
+                  <li key={i} className="flex items-center gap-2 text-xl">
                     <FaCheckCircle className="text-green-600" size={28} />
                     {ingredient}
                   </li>

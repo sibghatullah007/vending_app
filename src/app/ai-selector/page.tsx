@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FaMicrophoneAlt, FaCamera } from 'react-icons/fa';
 import { ImCross } from "react-icons/im";
 
@@ -23,6 +23,18 @@ interface ApiResponse {
   message: string;
 }
 
+interface ProductResponse {
+  success: boolean;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    category: string;
+    description: string;
+  };
+  message: string;
+}
+
 const styles = `
   @keyframes wave {
     0%, 100% {
@@ -36,6 +48,7 @@ const styles = `
 
 export default function Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const items = [
     {
       title: 'Energy Fuel',
@@ -68,6 +81,9 @@ export default function Page() {
   const [audioLevel, setAudioLevel] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [productData, setProductData] = useState<ProductResponse | null>(null);
 
   useEffect(() => {
     const styleSheet = document.createElement("style");
@@ -77,6 +93,28 @@ export default function Page() {
       document.head.removeChild(styleSheet);
     };
   }, []);
+
+  useEffect(() => {
+    const fetchProductData = async () => {
+      const id = searchParams?.get('id');
+      if (!id) return;
+
+      try {
+        const response = await fetch(`https://shark-supreme-readily.ngrok-free.app/product?id=${id}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setProductData(data);
+      } catch (error) {
+        console.error('Error fetching product data:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch product data');
+        setIsErrorModalOpen(true);
+      }
+    };
+
+    fetchProductData();
+  }, [searchParams]);
 
   const openCamera = () => {
     setIsCameraOpen(true);
@@ -126,10 +164,15 @@ export default function Page() {
     console.log("Active index:", index);
     setActiveIndex(index);
     
+    const categories = [
+      "Energy Fuel",
+      "Brain Fuel",
+      "Hydration Check",
+      "Muscle Pick"
+    ];
+    
     setTimeout(() => {
-      router.push('/products');
-      if ((index - activeIndex + items.length) % items.length === 0) {
-      }
+      router.push(`/products?category=${categories[index]}`);
     }, 300);
   };
 
@@ -240,7 +283,61 @@ export default function Page() {
   };
 
   const handleViewProducts = () => {
-    router.push('/products');
+    if (apiResponse?.analysis.recommended_category) {
+      router.push(`/products?category=${apiResponse.analysis.recommended_category}`);
+    }
+  };
+
+  const handleCapture = async () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const imageUrl = canvas.toDataURL('image/jpeg');
+        setCapturedImage(imageUrl);
+        setIsLoading(true);
+        
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const formData = new FormData();
+            formData.append('file', blob, 'capture.jpg');
+            
+            try {
+              const response = await fetch('https://shark-supreme-readily.ngrok-free.app/analyze-image', {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                },
+                body: formData,
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              console.log('API Response:', data);
+              setApiResponse(data);
+            } catch (error) {
+              console.error('Error uploading image:', error);
+              setError(error instanceof Error ? error.message : 'Failed to analyze image');
+              setIsErrorModalOpen(true);
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }, 'image/jpeg', 0.8);
+      }
+    }
+  };
+
+  const handleCloseErrorModal = () => {
+    setIsErrorModalOpen(false);
+    setError(null);
+    handleTryAgain();
   };
 
   return (
@@ -438,47 +535,7 @@ export default function Page() {
             )}
             {!capturedImage && (
               <button
-                onClick={async () => {
-                  if (videoRef.current) {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = videoRef.current.videoWidth;
-                    canvas.height = videoRef.current.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.drawImage(videoRef.current, 0, 0);
-                      const imageUrl = canvas.toDataURL('image/jpeg');
-                      setCapturedImage(imageUrl);
-                      setIsLoading(true);
-                      
-                      canvas.toBlob(async (blob) => {
-                        if (blob) {
-                          const formData = new FormData();
-                          formData.append('file', blob, 'capture.jpg');
-                          
-                          try {
-                            const response = await fetch('https://shark-supreme-readily.ngrok-free.app/analyze-image', {
-                              method: 'POST',
-                              headers: {
-                                'Accept': 'application/json',
-                              },
-                              body: formData,
-                            });
-                            if (!response.ok) {
-                              throw new Error(`HTTP error! status: ${response.status}`);
-                            }
-                            const data = await response.json();
-                            console.log('API Response:', data);
-                            setApiResponse(data);
-                          } catch (error) {
-                            console.error('Error uploading image:', error);
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }
-                      }, 'image/jpeg', 0.8);
-                    }
-                  }
-                }}
+                onClick={handleCapture}
                 className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-4 shadow-lg hover:bg-gray-100"
               >
                 <div className="w-16 h-16 border-4 border-gray-800 rounded-full"></div>
@@ -492,15 +549,33 @@ export default function Page() {
       {isLoading && (
         <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-sky-500 border-t-transparent mx-auto mb-4"></div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            <div className="relative w-24 h-24 mx-auto mb-8">
+              {/* Outer ring */}
+              <div className="absolute inset-0 border-4 border-sky-200 rounded-full"></div>
+              {/* Animated ring */}
+              <div className="absolute inset-0 border-4 border-sky-500 rounded-full animate-spin border-t-transparent"></div>
+              {/* Inner circle */}
+              <div className="absolute inset-4 bg-gradient-to-b from-sky-500 to-cyan-950 rounded-full animate-pulse"></div>
+            </div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-sky-500 to-cyan-950 bg-clip-text text-transparent mb-2">
               {capturedImage ? 'Analyzing Image' : 'Analyzing Audio'}
             </h2>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-8">
               {capturedImage 
                 ? 'Please wait while we process your image...'
                 : 'Please wait while we process your audio...'}
             </p>
+            {/* <button
+              onClick={() => {
+                setIsLoading(false);
+                setCapturedImage(null);
+                setApiResponse(null);
+                closeCamera();
+              }}
+              className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg shadow-lg hover:bg-gray-300 transition duration-300"
+            >
+              Go Back
+            </button> */}
           </div>
         </div>
       )}
@@ -518,6 +593,14 @@ export default function Page() {
                 <p className="text-2xl font-semibold text-sky-800">
                   Recommended Category: {apiResponse.analysis.recommended_category}
                 </p>
+                {productData && (
+                  <div className="mt-4">
+                    <h3 className="text-xl font-semibold text-gray-800">Product Details:</h3>
+                    <p className="text-lg text-gray-700">Name: {productData.product.name}</p>
+                    <p className="text-lg text-gray-700">Price: ${productData.product.price}</p>
+                    <p className="text-lg text-gray-700">Description: {productData.product.description}</p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-center gap-4">
@@ -532,6 +615,35 @@ export default function Page() {
                 className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg shadow-lg hover:bg-gray-300 transition duration-300"
               >
                 Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {isErrorModalOpen && (
+        <div className="fixed top-0 left-0 w-full h-full backdrop-blur-lg bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
+            <p className="text-gray-600 mb-6">{error || 'Failed to analyze the image. Please try again.'}</p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={handleCloseErrorModal}
+                className="px-6 py-3 bg-gradient-to-b from-sky-500 to-cyan-950 text-white font-bold rounded-lg shadow-lg hover:from-sky-600 hover:to-cyan-800 transition duration-300"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => {
+                  setIsErrorModalOpen(false);
+                  setError(null);
+                  closeCamera();
+                }}
+                className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg shadow-lg hover:bg-gray-300 transition duration-300"
+              >
+                Close
               </button>
             </div>
           </div>
